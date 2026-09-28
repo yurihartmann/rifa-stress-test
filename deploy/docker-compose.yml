@@ -17,6 +17,8 @@ x-go-env: &go-env
   OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
   OTEL_EXPORTER_OTLP_PROTOCOL: grpc
   OTEL_EXPORTER_OTLP_INSECURE: "true"
+  QUEUE_LOCK_TIMEOUT: 30s
+  QUEUE_MAX_ATTEMPTS: "5"
 
 x-go-limits: &go-limits
   cpus: "1"
@@ -66,7 +68,7 @@ services:
 
   migrate:
     <<: *go-image
-    command: ["/migrate"]
+    entrypoint: ["/migrate"]
     restart: "no"
     environment:
       <<: *go-env
@@ -82,7 +84,7 @@ services:
 
   api:
     <<: *go-image
-    command: ["/api"]
+    entrypoint: ["/api"]
     restart: unless-stopped
     environment:
       <<: *go-env
@@ -95,23 +97,17 @@ services:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started
+    # Distroless static has no shell, wget, or curl. A failing check
+    # marks the container unhealthy.
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -q -O /dev/null http://127.0.0.1:8080/health || curl -fsS -o /dev/null http://127.0.0.1:8080/health",
-        ]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 15s
+      disable: true
     deploy:
       resources:
         limits: *go-limits
 
   worker:
     <<: *go-image
-    command: ["/worker"]
+    entrypoint: ["/worker"]
     restart: unless-stopped
     environment:
       <<: *go-env
@@ -122,11 +118,7 @@ services:
       otel-collector:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      disable: true
     deploy:
       resources:
         limits: *go-limits
@@ -183,7 +175,6 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=24h
       - --storage.tsdb.retention.size=1GB
-      - --storage.tsdb.out-of-order-time-window=30m
       - --web.enable-remote-write-receiver
       - --web.listen-address=:9090
     ports:

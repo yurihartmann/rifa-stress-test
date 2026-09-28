@@ -1,7 +1,7 @@
 # Dokploy Compose service. See deploy/DOKPLOY.md.
 # No host ports: Traefik reaches container ports on the compose network.
-# Name the Dokploy Compose application `rifa` so Alloy's project filter matches
-# (Dokploy runs `docker compose -p <appName>` and overrides `name`).
+# Dokploy suffixes appName (for example rifa-08mfjd) and passes it as -p,
+# which overrides `name`. Deploy with `-p rifa` so Alloy's project filter matches.
 
 name: rifa
 
@@ -51,7 +51,7 @@ services:
       dockerfile: Dockerfile
     image: rifa-api:local
     pull_policy: build
-    command: ["/migrate"]
+    entrypoint: ["/migrate"]
     restart: "no"
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER:-rifa}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-rifa}?sslmode=disable"
@@ -81,7 +81,7 @@ services:
       dockerfile: Dockerfile
     image: rifa-api:local
     pull_policy: build
-    command: ["/api"]
+    entrypoint: ["/api"]
     restart: unless-stopped
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER:-rifa}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-rifa}?sslmode=disable"
@@ -95,6 +95,8 @@ services:
       OTEL_EXPORTER_OTLP_INSECURE: "true"
       HTTP_ADDR: ":8080"
       OTEL_SERVICE_NAME: rifa-api
+      QUEUE_LOCK_TIMEOUT: 30s
+      QUEUE_MAX_ATTEMPTS: "5"
     expose:
       - "8080"
     depends_on:
@@ -102,16 +104,10 @@ services:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started
+    # Distroless static has no shell, wget, or curl. A failing check
+    # marks the container unhealthy and Traefik drops the API.
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -q -O /dev/null http://127.0.0.1:8080/health || curl -fsS -o /dev/null http://127.0.0.1:8080/health",
-        ]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 15s
+      disable: true
     deploy:
       resources:
         limits:
@@ -124,7 +120,7 @@ services:
       dockerfile: Dockerfile
     image: rifa-api:local
     pull_policy: build
-    command: ["/worker"]
+    entrypoint: ["/worker"]
     restart: unless-stopped
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER:-rifa}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-rifa}?sslmode=disable"
@@ -137,17 +133,15 @@ services:
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_EXPORTER_OTLP_INSECURE: "true"
       OTEL_SERVICE_NAME: rifa-worker
+      QUEUE_LOCK_TIMEOUT: 30s
+      QUEUE_MAX_ATTEMPTS: "5"
     depends_on:
       migrate:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      disable: true
     deploy:
       resources:
         limits:
@@ -207,7 +201,6 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=24h
       - --storage.tsdb.retention.size=1GB
-      - --storage.tsdb.out-of-order-time-window=30m
       - --web.enable-remote-write-receiver
       - --web.listen-address=:9090
     expose:
