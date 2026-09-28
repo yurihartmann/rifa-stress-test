@@ -27,7 +27,15 @@ export function Layout() {
       </main>
       <footer className="footer">
         <p>
-          Laboratório local. O browser fala direto com a API em <code>{apiBaseUrl()}</code>.
+          {apiBaseUrl().length > 0 ? (
+            <>
+              Laboratório local. O browser fala direto com a API em <code>{apiBaseUrl()}</code>.
+            </>
+          ) : (
+            <>
+              O browser fala com a API neste mesmo endereço (<code>/v1</code>).
+            </>
+          )}
         </p>
       </footer>
     </div>

@@ -6,6 +6,8 @@ RUN npm ci
 
 COPY . .
 
+# Default matches the laptop stack. Dokploy passes "/" so the browser stays
+# same-origin and nginx proxies /v1 to the api service.
 ARG VITE_API_BASE_URL=http://localhost:8080
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
