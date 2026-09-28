@@ -9,9 +9,17 @@ Stack de laboratório (Postgres, migrate, API, worker, web e observabilidade) co
 | Projeto | `rifa` (já criado) |
 | Tipo | Compose, sourceType `github` |
 | composePath | `./deploy/docker-compose.dokploy.yml` |
-| Nome da aplicação Compose | `rifa` |
+| Projeto Compose (`-p`) | `rifa` |
 
-O nome da aplicação tem de ser exatamente `rifa`. O Dokploy sobe o arquivo com `docker compose -p <appName>`, e esse nome vira o label `com.docker.compose.project`. O Alloy só coleta logs dos containers `api` e `worker` desse projeto.
+O Dokploy, ao criar a aplicação, grava `appName` com um sufixo aleatório (por exemplo `rifa-08mfjd`). O comando padrão usa esse nome em `-p` e, com o `.env` ligado, também grava `COMPOSE_PROJECT_NAME` com o mesmo sufixo. Os dois vencem o `name: rifa` do arquivo e viram o label `com.docker.compose.project`. O Alloy só mantém logs quando esse label é exatamente `rifa`.
+
+A produção não muda o regex do Alloy. Ela substitui o comando de deploy por inteiro (o Dokploy prefixa `docker` e não acrescenta flags ao que você escreve). O `-p rifa` tem precedência sobre o `COMPOSE_PROJECT_NAME` do `.env`. O `--env-file` continua obrigatório: o deploy roda com `env -i` e, sem esse arquivo, os segredos não interpolam.
+
+```text
+compose -p rifa --env-file ./deploy/.env -f ./deploy/docker-compose.dokploy.yml up -d --build --remove-orphans
+```
+
+Se o comando padrão desta aplicação tiver flags a mais (`--pull always`, `--project-directory`), copie-as e troque só o `-p` para `rifa`. O campo é o Command documentado em [Docker Compose](https://docs.dokploy.com/docs/core/docker-compose).
 
 `autoDeploy` é opcional.
 
@@ -21,7 +29,7 @@ O nome da aplicação tem de ser exatamente `rifa`. O Dokploy sobe o arquivo com
 
 Não cadastre mounts extras na aplicação Compose. Com mounts, o Dokploy passa `--project-directory` na raiz do repositório e `../apps/api` deixa de apontar para o código.
 
-Deixe ligada a criação do arquivo `.env` (padrão, `createEnvFile`). O deploy roda com ambiente limpo (`env -i`) e só interpola este arquivo se receber `--env-file deploy/.env`.
+Deixe ligada a criação do arquivo `.env` (padrão, `createEnvFile`). O Dokploy grava `./deploy/.env`. O deploy roda com ambiente limpo (`env -i`) e só interpola esse arquivo quando o comando leva `--env-file ./deploy/.env`.
 
 ## isolatedDeployment
 
@@ -64,6 +72,8 @@ O Traefik usa o nome do serviço e a porta interna do container. Nada é publica
 | Prometheus | `prometheus` | `9090` |
 
 Publique `web`, `api` e `grafana`. Deixe o Prometheus sem domínio: o Grafana fala com ele pela rede do Compose. Só crie domínio em `prometheus:9090` se o k6 no seu computador precisar do remote write.
+
+`api` e `worker` não definem healthcheck. A imagem Go é distroless/static e não tem shell, `wget` nem `curl`; um check que falha deixa o container unhealthy e o Traefik tira a API do ar.
 
 Postgres, migrate, worker, otel-collector, tempo, loki e alloy ficam só na rede interna.
 

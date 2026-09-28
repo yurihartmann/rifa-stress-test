@@ -13,4 +13,6 @@ COPY --from=build /out/api /api
 COPY --from=build /out/worker /worker
 COPY --from=build /out/migrate /migrate
 USER nonroot:nonroot
-ENTRYPOINT ["/api"]
+# CMD, not ENTRYPOINT: Compose must be able to run /migrate and /worker.
+# An ENTRYPOINT would ignore `command` and always start /api.
+CMD ["/api"]
