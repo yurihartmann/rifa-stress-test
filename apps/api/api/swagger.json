@@ -252,6 +252,51 @@
                 }
             }
         },
+        "/raffles": {
+            "get": {
+                "description": "Storefront catalog. status=open lists raffles accepting orders. status=closed lists concluded raffles. Drafts are omitted.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "raffles"
+                ],
+                "summary": "List public raffles by status",
+                "parameters": [
+                    {
+                        "enum": [
+                            "open",
+                            "closed"
+                        ],
+                        "type": "string",
+                        "description": "Public raffle status",
+                        "name": "status",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.RaffleListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/raffles/{slug}": {
             "get": {
                 "description": "Public storefront view. available_tickets is total minus reserved minus sold.",
@@ -500,6 +545,17 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.TicketNumber"
+                    }
+                }
+            }
+        },
+        "dto.RaffleListResponse": {
+            "type": "object",
+            "properties": {
+                "raffles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.RaffleResponse"
                     }
                 }
             }

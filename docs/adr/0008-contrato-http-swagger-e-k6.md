@@ -18,6 +18,7 @@ Rotas da primeira etapa:
 
 | Método e rota | Uso |
 | --- | --- |
+| `GET /v1/raffles?status=` | Lista pública: `open` ou `closed`. Rascunho fica de fora |
 | `GET /v1/raffles/{slug}` | Vitrine |
 | `POST /v1/raffles/{slug}/orders` | Checkout: e-mail e quantidade |
 | `POST /v1/payments/webhooks` | Confirmação simulada |

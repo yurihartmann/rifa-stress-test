@@ -14,6 +14,7 @@ import (
 type handler struct {
 	webhookSecret  string
 	getRaffle      *usecase.GetRaffle
+	listRaffles    *usecase.ListRaffles
 	openOrder      *usecase.OpenOrder
 	confirmPayment *usecase.ConfirmPayment
 	listPurchases  *usecase.ListPurchasesByEmail
@@ -49,6 +50,36 @@ func normalizeEmail(value string) (string, error) {
 		return "", entity.Validation("email is invalid")
 	}
 	return email, nil
+}
+
+// ListRaffles godoc
+//
+//	@Summary		List public raffles by status
+//	@Description	Storefront catalog. status=open lists raffles accepting orders. status=closed lists concluded raffles. Drafts are omitted.
+//	@Tags			raffles
+//	@Produce		json
+//	@Param			status	query		string	true	"Public raffle status"	Enums(open, closed)
+//	@Success		200		{object}	dto.RaffleListResponse
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		500		{object}	dto.ErrorResponse
+//	@Router			/raffles [get]
+func (h *handler) ListRaffles(c *gin.Context) {
+	status, err := entity.ParseRaffleStatus(strings.TrimSpace(c.Query("status")))
+	if err != nil || (status != entity.RaffleStatusOpen && status != entity.RaffleStatusClosed) {
+		validation(c, "status must be open or closed")
+		return
+	}
+	raffles, err := h.listRaffles.Execute(c.Request.Context(), status)
+	if err != nil {
+		h.report(c, err)
+		writeError(c, err)
+		return
+	}
+	response := dto.RaffleListResponse{Raffles: make([]dto.RaffleResponse, 0, len(raffles))}
+	for _, raffle := range raffles {
+		response.Raffles = append(response.Raffles, raffleResponse(raffle))
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // GetRaffle godoc

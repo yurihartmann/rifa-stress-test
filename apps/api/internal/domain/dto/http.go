@@ -42,6 +42,10 @@ type UpdateRaffleStatusRequest struct {
 	Status string `json:"status" binding:"required"`
 }
 
+type RaffleListResponse struct {
+	Raffles []RaffleResponse `json:"raffles"`
+}
+
 type CreateOrderRequest struct {
 	Email    string `json:"email" binding:"required"`
 	Quantity int    `json:"quantity" binding:"required,gt=0"`

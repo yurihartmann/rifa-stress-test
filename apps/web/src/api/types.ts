@@ -47,6 +47,8 @@ export type PurchasesResponse = {
   purchases: Purchase[];
 };
 
+export type PublicRaffleStatus = "open" | "closed";
+
 export type CreateRaffleInput = {
   slug: string;
   title: string;

@@ -140,3 +140,31 @@ func (u *GetRaffle) Execute(ctx context.Context, slug string) (entity.Raffle, er
 	}
 	return raffle, nil
 }
+
+type ListRaffles struct {
+	raffles repository.RaffleRepository
+}
+
+func NewListRaffles(raffles repository.RaffleRepository) *ListRaffles {
+	return &ListRaffles{raffles: raffles}
+}
+
+func (u *ListRaffles) Execute(ctx context.Context, status entity.RaffleStatus) ([]entity.Raffle, error) {
+	if status != entity.RaffleStatusOpen && status != entity.RaffleStatusClosed {
+		return nil, entity.Validation("status must be open or closed")
+	}
+	raffles, err := u.raffles.FindAllByFilters(ctx, repository.Query{
+		Filters: []repository.Filter{repository.Eq(repository.ColumnStatus, string(status))},
+		Sorts: []repository.Sort{
+			{Column: repository.ColumnCreatedAt, Desc: true},
+			{Column: repository.ColumnSlug},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list raffles: %w", err)
+	}
+	if raffles == nil {
+		return []entity.Raffle{}, nil
+	}
+	return raffles, nil
+}
