@@ -95,6 +95,13 @@ definitions:
           $ref: '#/definitions/dto.TicketNumber'
         type: array
     type: object
+  dto.RaffleListResponse:
+    properties:
+      raffles:
+        items:
+          $ref: '#/definitions/dto.RaffleResponse'
+        type: array
+    type: object
   dto.RaffleResponse:
     properties:
       available_tickets:
@@ -305,6 +312,37 @@ paths:
       summary: List purchases by email
       tags:
       - purchases
+  /raffles:
+    get:
+      description: Storefront catalog. status=open lists raffles accepting orders. status=closed
+        lists concluded raffles. Drafts are omitted.
+      parameters:
+      - description: Public raffle status
+        enum:
+        - open
+        - closed
+        in: query
+        name: status
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RaffleListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: List public raffles by status
+      tags:
+      - raffles
   /raffles/{slug}:
     get:
       description: Public storefront view. available_tickets is total minus reserved

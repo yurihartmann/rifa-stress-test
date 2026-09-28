@@ -4,6 +4,7 @@ import type {
   Order,
   Purchase,
   PurchasesResponse,
+  PublicRaffleStatus,
   Raffle,
   RaffleStatus,
   Ticket,
@@ -209,6 +210,20 @@ function parsePurchases(value: unknown): PurchasesResponse {
     email: asString(record.email),
     purchases,
   };
+}
+
+function parseRaffleList(value: unknown): Raffle[] {
+  const record = asRecord(value);
+  if (!record || !Array.isArray(record.raffles)) {
+    throw invalid("A API devolveu uma lista de rifas inválida.");
+  }
+  return record.raffles.map((item) => parseRaffle(item));
+}
+
+export async function listRaffles(status: PublicRaffleStatus, signal?: AbortSignal): Promise<Raffle[]> {
+  const query = new URLSearchParams({ status });
+  const payload = await request(`/v1/raffles?${query.toString()}`, { signal });
+  return parseRaffleList(payload);
 }
 
 export async function getRaffle(slug: string, signal?: AbortSignal): Promise<Raffle> {

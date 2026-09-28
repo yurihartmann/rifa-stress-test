@@ -18,6 +18,7 @@ type Dependencies struct {
 	AdminToken     string
 	WebhookSecret  string
 	GetRaffle      *usecase.GetRaffle
+	ListRaffles    *usecase.ListRaffles
 	OpenOrder      *usecase.OpenOrder
 	ConfirmPayment *usecase.ConfirmPayment
 	ListPurchases  *usecase.ListPurchasesByEmail
@@ -40,6 +41,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	h := &handler{
 		webhookSecret:  deps.WebhookSecret,
 		getRaffle:      deps.GetRaffle,
+		listRaffles:    deps.ListRaffles,
 		openOrder:      deps.OpenOrder,
 		confirmPayment: deps.ConfirmPayment,
 		listPurchases:  deps.ListPurchases,
@@ -52,6 +54,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			}
 		},
 	}
+	v1.GET("/raffles", h.ListRaffles)
 	v1.GET("/raffles/:slug", h.GetRaffle)
 	v1.POST("/raffles/:slug/orders", h.CreateOrder)
 	v1.POST("/payments/webhooks", h.ConfirmPayment)

@@ -60,6 +60,7 @@ func newApp(t *testing.T) (*gin.Engine, *gorm.DB, *testClock) {
 		AdminToken:     "admin-secret",
 		WebhookSecret:  "wh-secret",
 		GetRaffle:      usecase.NewGetRaffle(raffles),
+		ListRaffles:    usecase.NewListRaffles(raffles),
 		OpenOrder:      usecase.NewOpenOrder(raffles, orders, payments, 15*time.Minute, clock.Now, nil),
 		ConfirmPayment: usecase.NewConfirmPayment(raffles, orders, payments, events, queue, clock.Now, nil),
 		ListPurchases:  usecase.NewListPurchasesByEmail(orders, raffles, tickets),
@@ -256,6 +257,82 @@ func TestInsufficientTicketsAndClosedRaffle(t *testing.T) {
 	after := perform(engine, http.MethodPost, "/v1/raffles/hat/orders", dto.CreateOrderRequest{Email: "c@b.com", Quantity: 1}, nil)
 	if after.Code != http.StatusConflict || decode[dto.ErrorResponse](t, after).Code != dto.CodeRaffleClosed {
 		t.Fatalf("closed %d %s", after.Code, after.Body.String())
+	}
+}
+
+func TestListRafflesByPublicStatus(t *testing.T) {
+	engine, _, clock := newApp(t)
+	admin := map[string]string{"Authorization": "Bearer admin-secret"}
+	base := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
+
+	create := func(slug, title string, at time.Time) dto.RaffleResponse {
+		t.Helper()
+		clock.Set(at)
+		rec := perform(engine, http.MethodPost, "/v1/admin/raffles", dto.CreateRaffleRequest{
+			Slug: slug, Title: title, Description: "desc", TicketPriceCents: 1500, TotalTickets: 10,
+		}, admin)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create %s %d %s", slug, rec.Code, rec.Body.String())
+		}
+		return decode[dto.RaffleResponse](t, rec)
+	}
+	setStatus := func(id, status string) {
+		t.Helper()
+		rec := perform(engine, http.MethodPatch, "/v1/admin/raffles/"+id, dto.UpdateRaffleStatusRequest{Status: status}, admin)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %s %d %s", status, rec.Code, rec.Body.String())
+		}
+	}
+
+	empty := perform(engine, http.MethodGet, "/v1/raffles?status=open", nil, nil)
+	if empty.Code != http.StatusOK {
+		t.Fatalf("empty %d %s", empty.Code, empty.Body.String())
+	}
+	if got := decode[dto.RaffleListResponse](t, empty); len(got.Raffles) != 0 {
+		t.Fatalf("empty list %+v", got)
+	}
+
+	draft := create("rascunho", "Rascunho", base)
+	older := create("aberta-antiga", "Aberta antiga", base.Add(time.Minute))
+	setStatus(older.ID, "open")
+	newer := create("aberta-nova", "Aberta nova", base.Add(2*time.Minute))
+	setStatus(newer.ID, "open")
+	done := create("concluida", "Concluída", base.Add(3*time.Minute))
+	setStatus(done.ID, "closed")
+
+	for _, path := range []string{"/v1/raffles", "/v1/raffles?status=draft", "/v1/raffles?status=archived"} {
+		rec := perform(engine, http.MethodGet, path, nil, nil)
+		if rec.Code != http.StatusBadRequest || decode[dto.ErrorResponse](t, rec).Code != dto.CodeValidationError {
+			t.Fatalf("%s %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+
+	openRec := perform(engine, http.MethodGet, "/v1/raffles?status=open", nil, nil)
+	if openRec.Code != http.StatusOK {
+		t.Fatalf("open %d %s", openRec.Code, openRec.Body.String())
+	}
+	openList := decode[dto.RaffleListResponse](t, openRec)
+	if len(openList.Raffles) != 2 || openList.Raffles[0].Slug != "aberta-nova" || openList.Raffles[1].Slug != "aberta-antiga" {
+		t.Fatalf("open order %+v", openList.Raffles)
+	}
+	if openList.Raffles[0].Title != "Aberta nova" || openList.Raffles[0].Status != "open" || openList.Raffles[0].AvailableTickets != 10 || openList.Raffles[0].TicketPriceCents != 1500 {
+		t.Fatalf("open item %+v", openList.Raffles[0])
+	}
+
+	closedRec := perform(engine, http.MethodGet, "/v1/raffles?status=closed", nil, nil)
+	closedList := decode[dto.RaffleListResponse](t, closedRec)
+	if closedRec.Code != http.StatusOK || len(closedList.Raffles) != 1 || closedList.Raffles[0].Slug != "concluida" || closedList.Raffles[0].Status != "closed" {
+		t.Fatalf("closed %d %+v", closedRec.Code, closedList)
+	}
+	for _, item := range append(openList.Raffles, closedList.Raffles...) {
+		if item.ID == draft.ID {
+			t.Fatalf("draft leaked into public list")
+		}
+	}
+
+	one := perform(engine, http.MethodGet, "/v1/raffles/aberta-nova", nil, nil)
+	if one.Code != http.StatusOK || decode[dto.RaffleResponse](t, one).Slug != "aberta-nova" {
+		t.Fatalf("detail still works %d %s", one.Code, one.Body.String())
 	}
 }
 
