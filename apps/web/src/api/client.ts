@@ -24,6 +24,8 @@ export class ApiError extends Error {
 export function apiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_BASE_URL;
   const configured = typeof raw === "string" ? raw.trim() : "";
+  // Unset keeps the laptop default. "/" (Dokploy) strips to "" so fetch stays
+  // on this origin and nginx proxies /v1 to the api service.
   const base = configured.length > 0 ? configured : "http://localhost:8080";
   return base.replace(/\/+$/, "");
 }

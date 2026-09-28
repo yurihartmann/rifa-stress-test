@@ -23,3 +23,5 @@ Grafana abre como admin anônimo. O login `admin` / `admin` também funciona. Se
 `make logs` e `make ps` acompanham os containers. `make down` para a stack e mantém o volume do Postgres. `make test-api` roda `go test ./...` em `apps/api` quando o módulo existe.
 
 O k6 roda no host, contra http://localhost:8080, e pode enviar métricas para http://localhost:9090/api/v1/write.
+
+Para o mesmo stack no Dokploy, use `deploy/docker-compose.dokploy.yml`. O passo a passo está em `deploy/DOKPLOY.md`.
