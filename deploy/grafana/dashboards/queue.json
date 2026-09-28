@@ -1,0 +1,77 @@
+{
+  "uid": "rifa-queue",
+  "title": "Fila: profundidade, idade e falha",
+  "tags": ["rifa", "queue"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Métricas da fila pedidas à API",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "Ainda não há nomes Prometheus no código da API. Este dashboard não inventa PromQL para a fila. O agente da API foi pedido a emitir:\n\n- **queue depth** — profundidade da fila por status\n- **oldest pending** — idade do `pending` mais antigo\n- **generation failures** — falhas de emissão\n- **tickets assigned** — bilhetes emitidos\n- **orders by status** — pedidos por status\n\nTambém na lista, fora deste painel de fila: **http duration** e **reservation tx**.\n\nO gráfico ao vivo é o pipeline de spans do collector. A profundidade da fila em si espera a métrica da aplicação. Logs do worker ficam embaixo. Healthcheck não é sinal de negócio."
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Collector: spans aceitos e falha de exportação",
+      "description": "Saúde do pipeline de traces, não a profundidade da fila de bilhetes.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_receiver_accepted_spans_total{job=\"otel-collector-internal\"}[5m]))",
+          "legendFormat": "spans aceitos/s",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(otelcol_exporter_send_failed_spans_total{job=\"otel-collector-internal\"}[5m]))",
+          "legendFormat": "falha ao exportar spans/s",
+          "editorMode": "code",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "Worker: emissão, fila e falha",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 15 },
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"rifa-app\", service=\"worker\"} |~ \"(?i)queue|pending|ticket|fail|error\"",
+          "editorMode": "code"
+        }
+      ]
+    }
+  ]
+}

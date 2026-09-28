@@ -1,0 +1,98 @@
+{
+  "uid": "rifa-postgres-reservation",
+  "title": "Postgres e ponto quente da reserva",
+  "tags": ["rifa", "postgres"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Ponto quente da reserva",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "Postgres do laboratório fica em 1 CPU e 2 GB. Não há exporter do banco: a saturação da reserva aparece na métrica de aplicação **reservation tx** (duração da transação de reserva), que o agente da API foi pedido a emitir e ainda não está nomeada no código.\n\nTambém pedidos ao agente da API, sem PromQL inventado aqui: **http duration**, **orders by status**, **queue depth**, **oldest pending**, **tickets assigned**, **generation failures**.\n\nOs gráficos abaixo usam heap do processo e a taxa de pontos OTLP aceitos pelo collector, mais logs de commit/rollback."
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Processo: heap alocado",
+      "description": "Pressão de memória dos processos que exportam runtime Go via OTLP. O teto do container é 512 MB; GOMEMLIMIT=450MiB.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_runtime_go_mem_heap_alloc_bytes{job=\"otel-collector\"}",
+          "legendFormat": "{{service_name}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Collector: pontos de métrica aceitos",
+      "description": "Sinal de que o pipeline OTLP de métricas está recebendo dados. Não é a transação de reserva.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_receiver_accepted_metric_points_total{job=\"otel-collector-internal\"}[5m]))",
+          "legendFormat": "metric points/s",
+          "editorMode": "code",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "Logs de reserva, commit e rollback",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 15 },
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"rifa-app\"} |~ \"(?i)reserv|commit|rollback|capacity\"",
+          "editorMode": "code"
+        }
+      ]
+    }
+  ]
+}

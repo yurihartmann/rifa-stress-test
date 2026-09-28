@@ -1,0 +1,89 @@
+{
+  "uid": "rifa-logs-trace",
+  "title": "Logs para trace",
+  "tags": ["rifa", "logs"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Salto pelo trace_id",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "O Alloy envia o stdout de `api` e `worker` ao Loki sem promover `trace_id` a label. No log, o campo derivado **TraceID** (JSON `\"trace_id\":\"…\"` ou logfmt `trace_id=`) abre o trace no Tempo.\n\nMétricas de negócio continuam a cargo da API e ainda não têm nome no código: **http duration**, **reservation tx**, **orders by status**, **queue depth**, **oldest pending**, **tickets assigned**, **generation failures**."
+      }
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "api e worker",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 16, "x": 0, "y": 6 },
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"rifa-app\", service=~\"api|worker\"}",
+          "editorMode": "code"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Collector: spans enviados ao Tempo",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 12, "w": 8, "x": 16, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_exporter_sent_spans_total{job=\"otel-collector-internal\"}[5m]))",
+          "legendFormat": "spans/s",
+          "editorMode": "code",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "Linhas com trace_id",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"rifa-app\"} |~ \"trace_id\"",
+          "editorMode": "code"
+        }
+      ]
+    }
+  ]
+}

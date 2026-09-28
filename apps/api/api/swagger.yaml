@@ -1,0 +1,391 @@
+basePath: /v1
+definitions:
+  dto.CreateOrderRequest:
+    properties:
+      email:
+        type: string
+      quantity:
+        type: integer
+    required:
+    - email
+    - quantity
+    type: object
+  dto.CreateRaffleRequest:
+    properties:
+      description:
+        type: string
+      slug:
+        type: string
+      ticket_price_cents:
+        type: integer
+      title:
+        type: string
+      total_tickets:
+        type: integer
+    required:
+    - slug
+    - ticket_price_cents
+    - title
+    - total_tickets
+    type: object
+  dto.Empty:
+    type: object
+  dto.ErrorResponse:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  dto.OrderResponse:
+    properties:
+      amount_cents:
+        type: integer
+      email:
+        type: string
+      expires_at:
+        type: string
+      order_id:
+        type: string
+      payment:
+        $ref: '#/definitions/dto.PaymentResponse'
+      quantity:
+        type: integer
+      raffle_slug:
+        type: string
+      status:
+        type: string
+      tickets:
+        items:
+          $ref: '#/definitions/dto.TicketNumber'
+        type: array
+    type: object
+  dto.PaymentResponse:
+    properties:
+      payment_id:
+        type: string
+      qr_code_payload:
+        type: string
+    type: object
+  dto.PurchaseListResponse:
+    properties:
+      email:
+        type: string
+      purchases:
+        items:
+          $ref: '#/definitions/dto.PurchaseResponse'
+        type: array
+    type: object
+  dto.PurchaseResponse:
+    properties:
+      amount_cents:
+        type: integer
+      order_id:
+        type: string
+      quantity:
+        type: integer
+      raffle_slug:
+        type: string
+      raffle_title:
+        type: string
+      status:
+        type: string
+      tickets:
+        items:
+          $ref: '#/definitions/dto.TicketNumber'
+        type: array
+    type: object
+  dto.RaffleResponse:
+    properties:
+      available_tickets:
+        type: integer
+      description:
+        type: string
+      id:
+        type: string
+      slug:
+        type: string
+      status:
+        type: string
+      ticket_price_cents:
+        type: integer
+      title:
+        type: string
+      total_tickets:
+        type: integer
+    type: object
+  dto.TicketNumber:
+    properties:
+      number:
+        type: string
+    type: object
+  dto.UpdateRaffleStatusRequest:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
+  dto.WebhookRequest:
+    properties:
+      event_id:
+        type: string
+      payment_id:
+        type: string
+      status:
+        type: string
+    required:
+    - event_id
+    - payment_id
+    - status
+    type: object
+info:
+  contact: {}
+  description: HTTP API for the raffle stress-test laboratory.
+  title: Raffle Stress Test API
+  version: "1.0"
+paths:
+  /admin/raffles:
+    post:
+      consumes:
+      - application/json
+      description: Admin only. Does not insert ticket rows until the raffle is opened.
+      parameters:
+      - description: Raffle
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateRaffleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.RaffleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminBearer: []
+      summary: Create a draft raffle
+      tags:
+      - admin
+  /admin/raffles/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Opening a raffle inserts ticket numbers 1..total_tickets once.
+        Closing keeps tickets and orders.
+      parameters:
+      - description: Raffle ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Status
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateRaffleStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RaffleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminBearer: []
+      summary: Change raffle status
+      tags:
+      - admin
+  /payments/webhooks:
+    post:
+      consumes:
+      - application/json
+      description: Applies a paid webhook once. Replays of the same event_id return
+        200 without selling again.
+      parameters:
+      - description: Webhook secret
+        in: header
+        name: X-Webhook-Secret
+        required: true
+        type: string
+      - description: Payment event
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/dto.WebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Empty'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - WebhookSecret: []
+      summary: Confirm a simulated payment
+      tags:
+      - payments
+  /purchases:
+    get:
+      description: Returns only orders for the normalized email. An unknown email
+        is an empty list.
+      parameters:
+      - description: Customer email
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: List purchases by email
+      tags:
+      - purchases
+  /raffles/{slug}:
+    get:
+      description: Public storefront view. available_tickets is total minus reserved
+        minus sold.
+      parameters:
+      - description: Raffle slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RaffleResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Get a raffle by slug
+      tags:
+      - raffles
+  /raffles/{slug}/orders:
+    post:
+      consumes:
+      - application/json
+      description: Reserves ticket capacity and returns a pending simulated payment.
+        Numbers are not chosen here.
+      parameters:
+      - description: Raffle slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: Checkout
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.OrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Open a checkout order
+      tags:
+      - orders
+securityDefinitions:
+  AdminBearer:
+    description: Admin token formatted as "Bearer <token>".
+    in: header
+    name: Authorization
+    type: apiKey
+  WebhookSecret:
+    description: Shared payment webhook secret.
+    in: header
+    name: X-Webhook-Secret
+    type: apiKey
+swagger: "2.0"

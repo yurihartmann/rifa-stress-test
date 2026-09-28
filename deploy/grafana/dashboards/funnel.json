@@ -1,0 +1,193 @@
+{
+  "uid": "rifa-funnel",
+  "title": "Funil: checkout, webhook e emissão",
+  "tags": ["rifa", "funnel"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Métricas pedidas à API",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "O código da API ainda não define os nomes Prometheus. Os gráficos deste dashboard usam duração HTTP e runtime Go no padrão OpenTelemetry (`http_server_request_duration_seconds`, `process_runtime_go_*`), que só aparecem depois que o processo exportar OTLP.\n\nNomes que o agente da API foi pedido a emitir (não são queries ao vivo):\n\n- **http duration** — duração e contagem HTTP por rota, método e status\n- **reservation tx** — duração da transação de reserva\n- **orders by status** — pedidos por status\n- **queue depth** — profundidade da fila por status\n- **oldest pending** — idade do `pending` mais antigo\n- **tickets assigned** — bilhetes emitidos\n- **generation failures** — falhas de emissão\n\nHealthcheck de `api` e `worker` não entra aqui. O funil de negócio é checkout, webhook e emissão nos logs abaixo."
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP: taxa por rota e status",
+      "description": "Métrica HTTP padrão do OpenTelemetry. http duration da aplicação entra quando a API publicar a série.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name, http_route, http_request_method, http_response_status_code) (rate(http_server_request_duration_seconds_count{job=\"otel-collector\"}[5m]))",
+          "legendFormat": "{{service_name}} {{http_request_method}} {{http_route}} {{http_response_status_code}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP: duração p95",
+      "description": "http duration no histograma padrão OTEL (unidade segundos).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, service_name, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"otel-collector\"}[5m])))",
+          "legendFormat": "{{service_name}} {{http_route}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Processo: goroutines",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_runtime_go_goroutines{job=\"otel-collector\"}",
+          "legendFormat": "{{service_name}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Processo: heap alocado",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_runtime_go_mem_heap_alloc_bytes{job=\"otel-collector\"}",
+          "legendFormat": "{{service_name}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "Checkout",
+      "description": "Trecho do funil de checkout. Clique no trace_id para abrir o Tempo.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 23 },
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"rifa-app\", service=\"api\"} |~ \"(?i)checkout|openorder|order\"",
+          "editorMode": "code"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Webhook",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 23 },
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"rifa-app\", service=\"api\"} |~ \"(?i)webhook|payment|confirmpayment\"",
+          "editorMode": "code"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Emissão",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 23 },
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"rifa-app\", service=\"worker\"} |~ \"(?i)ticket|generateticket|generation\"",
+          "editorMode": "code"
+        }
+      ]
+    }
+  ]
+}
